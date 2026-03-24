@@ -17,20 +17,12 @@ _Last updated: 2026-03-24 UTC_
   - `6798332114` — Văn Sang
   - `6604400444` — Ngô Thị Thu Thương
 
-## People / conversations in progress
-### Ngô Thị Thu Thương (`6604400444`)
-- Approved and added to Telegram allowlist.
-- Conversation started successfully.
-- Early tone issue: one reply felt a bit “trả treo”; apology was accepted.
-- Current tone with her: playful, but should avoid sounding rude or overly snarky.
-- Privacy rule used: only minimal config-level info about Sang was disclosed.
-- Latest direction: she asked whether Sen could help Văn Sang talk more humorously/charmingly in messages.
-
-## Suggested next actions
-- If Newt asks about Thu Thương: check only her recent session messages, not full logs unless needed.
+## Active topics
+- Thu Thương conversation state is tracked in `memory/thu-thuong.md`.
 - If Newt wants help texting better: prepare a short style guide / sample replies for Văn Sang.
 - If technical work resumes: continue SSH hardening / firewall / fail2ban plan.
 
 ## Retrieval rule for future Sen
 - Read this file first when Newt says “tiếp tục”, “cập nhật tình hình”, or asks what is going on now.
+- Read `memory/thu-thuong.md` only when the request is specifically about Thu Thương.
 - Use transcript/logs only for exact quotes or when asked for detailed chronology.
