@@ -366,4 +366,194 @@ if days_since_last_purchase > 30 => inactive
 - Chỉ thêm 1 box UI gọi API ngoài.
 - API ngoài có thể do CI3 gọi sang n8n hoặc service riêng.
 - Nếu không muốn sửa nhiều UI, có thể inject box bằng userscript/browser extension nội bộ.
+
+## 9. Scope V1 cho solo dev (1-2 ngày)
+
+### Mục tiêu V1
+Chỉ làm một box `AI Customer Insight` với dữ liệu vừa đủ để demo/use thật.
+
+### V1 chỉ cần có
+1. `customer_id` lấy từ URL hoặc context hiện tại.
+2. Một endpoint trả JSON insight.
+3. 4-5 metrics cơ bản:
+   - invoice_count
+   - total_spent
+   - total_debt
+   - total_loan
+   - days_since_last_purchase
+4. 1 đoạn summary ngắn (2-3 câu).
+5. 1-3 next actions.
+6. 1-2 alert nếu có.
+
+### V1 chưa cần
+- chatbot
+- precompute toàn bộ khách
+- lưu snapshot riêng
+- queue/phân tán/caching phức tạp
+- phân tích tất cả tab
+- rewrite CRM
+
+### Kế hoạch 2 ngày
+#### Ngày 1
+- tạo endpoint `/api/customer-insight/{id}`
+- trả JSON fake/hardcode trước
+- dựng box UI render JSON đó
+
+#### Ngày 2
+- nối query thật từ CRM
+- thêm rule-based tags/alerts
+- thêm call AI để sinh `summary` + `next_actions`
+- polish wording
+
+## 10. Pseudo implementation kiểu CI3
+
+### Route gợi ý
+```php
+$route['api/customer-insight/(:num)'] = 'customer_insight/show/$1';
+```
+
+### Controller gợi ý
+```php
+class Customer_insight extends CI_Controller
+{
+    public function show($customerId)
+    {
+        $customer = $this->Customer_model->find($customerId);
+        if (!$customer) {
+            return $this->output
+                ->set_status_header(404)
+                ->set_content_type('application/json')
+                ->set_output(json_encode(['message' => 'Customer not found']));
+        }
+
+        $metrics = $this->Customer_model->getInsightMetrics($customerId);
+        $recentPurchases = $this->Customer_model->getRecentPurchases($customerId, 5);
+        $recentCare = $this->Customer_model->getRecentCareHistory($customerId, 5);
+
+        $ruleData = $this->Insight_rule_service->build($customer, $metrics);
+        $aiData = $this->Insight_ai_service->summarize($customer, $metrics, $recentPurchases, $recentCare, $ruleData);
+
+        $response = [
+            'customer_id' => (int)$customerId,
+            'generated_at' => gmdate('c'),
+            'score' => $ruleData['score'],
+            'segment' => $ruleData['segment'],
+            'tags' => $ruleData['tags'],
+            'summary' => $aiData['summary'],
+            'metrics' => $metrics,
+            'alerts' => $ruleData['alerts'],
+            'next_actions' => $aiData['next_actions'],
+        ];
+
+        return $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode($response));
+    }
+}
+```
+
+### Rule service gợi ý
+```php
+class Insight_rule_service
+{
+    public function build($customer, $metrics)
+    {
+        $score = 50;
+        $tags = [];
+        $alerts = [];
+        $segment = 'Normal';
+
+        if ($metrics['total_spent'] > 1000000000) {
+            $score += 20;
+            $tags[] = 'high_value';
+            $segment = 'VIP';
+        }
+
+        if ($metrics['invoice_count'] > 30) {
+            $score += 10;
+            $tags[] = 'repeat_customer';
+        }
+
+        if ($metrics['total_debt'] > 300000000) {
+            $score -= 10;
+            $tags[] = 'debt_watch';
+            $alerts[] = [
+                'level' => 'warning',
+                'code' => 'HIGH_DEBT',
+                'message' => 'Công nợ hiện tại đang cao.'
+            ];
+        }
+
+        if ($metrics['days_since_last_purchase'] > 30) {
+            $score -= 8;
+            $tags[] = 'inactive';
+            $alerts[] = [
+                'level' => 'warning',
+                'code' => 'INACTIVE',
+                'message' => 'Khách đã lâu chưa phát sinh mua mới.'
+            ];
+        }
+
+        return [
+            'score' => max(0, min(100, $score)),
+            'segment' => $segment,
+            'tags' => $tags,
+            'alerts' => $alerts,
+        ];
+    }
+}
+```
+
+## 11. Prompt mẫu cho AI summary + next action
+
+### Input tối thiểu cho AI
+- customer basic info
+- invoice_count
+- total_spent
+- total_debt
+- total_loan
+- days_since_last_purchase
+- 3-5 recent purchases
+- 3-5 recent care notes (nếu có)
+- tags/alerts đã tính bằng rule
+
+### Prompt gợi ý
+```text
+Bạn là trợ lý phân tích CRM nội bộ cho đội sales/chăm sóc khách hàng.
+
+Nhiệm vụ:
+1. Viết summary ngắn 2-3 câu bằng tiếng Việt, rõ ràng, thực dụng.
+2. Đề xuất 1-3 next actions cụ thể, ưu tiên hành động có thể làm ngay.
+3. Không bịa dữ liệu. Chỉ dùng thông tin được cung cấp.
+4. Không dùng từ ngữ khoa trương, không viết kiểu quảng cáo.
+5. Nếu dữ liệu chưa đủ, nói ngắn gọn là cần thêm dữ liệu.
+
+Dữ liệu đầu vào:
+- Customer: {{customer_json}}
+- Metrics: {{metrics_json}}
+- Tags/alerts: {{rule_json}}
+- Recent purchases: {{recent_purchases_json}}
+- Recent care history: {{recent_care_json}}
+
+Trả về JSON với format:
+{
+  "summary": "...",
+  "next_actions": [
+    {"type": "follow_up", "label": "..."},
+    {"type": "message", "label": "..."}
+  ]
+}
+```
+
+### Output mong muốn
+```json
+{
+  "summary": "Khách hàng giá trị cao, có lịch sử mua đều và tổng chi lớn. Hiện cần ưu tiên theo dõi công nợ và chủ động chăm sóc lại vì đã lâu chưa phát sinh mua mới.",
+  "next_actions": [
+    {"type": "follow_up", "label": "Kiểm tra lần chăm sóc gần nhất"},
+    {"type": "message", "label": "Gọi hoặc nhắn chăm sóc trong 1-3 ngày"},
+    {"type": "upsell", "label": "Đề xuất dịch vụ phù hợp theo lịch sử mua gần nhất"}
+  ]
+}
+```
 ```
