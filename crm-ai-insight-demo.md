@@ -187,7 +187,181 @@ if total_debt > 300000000 => add tag debt_watch
 if days_since_last_purchase > 30 => add alert inactive
 ```
 
-## 5. Mức triển khai ít đụng CRM nhất
+## 5. Data mapping / pseudo query từ CRM sang insight
+
+### Dữ liệu tối thiểu nên lấy
+1. **Profile khách hàng**
+   - customer_id
+   - name
+   - gender
+   - birthday
+   - branch_id / branch_name
+   - created_at
+2. **Metrics tổng hợp**
+   - invoice_count
+   - total_spent
+   - total_debt
+   - total_loan
+   - last_purchase_at
+   - days_since_last_purchase
+3. **Lịch sử mua gần nhất**
+   - invoice_id
+   - invoice_date
+   - amount
+   - service/product summary
+4. **Lịch sử chăm sóc gần nhất** (nếu có)
+   - care_date
+   - staff_name
+   - note
+   - outcome/status
+5. **Lịch hẹn gần nhất** (nếu có)
+   - appointment_date
+   - status
+   - service
+
+### Pseudo query gợi ý
+
+#### Query profile
+```sql
+SELECT
+  c.id AS customer_id,
+  c.full_name,
+  c.gender,
+  c.birthday,
+  c.branch_id,
+  b.name AS branch_name,
+  c.created_at
+FROM customers c
+LEFT JOIN branches b ON b.id = c.branch_id
+WHERE c.id = :customer_id;
+```
+
+#### Query metrics tổng hợp
+```sql
+SELECT
+  COUNT(i.id) AS invoice_count,
+  COALESCE(SUM(i.total_amount), 0) AS total_spent,
+  COALESCE(SUM(i.debt_amount), 0) AS total_debt,
+  COALESCE(SUM(i.loan_amount), 0) AS total_loan,
+  MAX(i.created_at) AS last_purchase_at
+FROM invoices i
+WHERE i.customer_id = :customer_id
+  AND i.status = 'completed';
+```
+
+#### Query lịch sử mua gần nhất
+```sql
+SELECT
+  i.id AS invoice_id,
+  i.created_at AS invoice_date,
+  i.total_amount,
+  GROUP_CONCAT(ii.item_name SEPARATOR ', ') AS items_summary
+FROM invoices i
+LEFT JOIN invoice_items ii ON ii.invoice_id = i.id
+WHERE i.customer_id = :customer_id
+GROUP BY i.id
+ORDER BY i.created_at DESC
+LIMIT 10;
+```
+
+#### Query lịch sử chăm sóc gần nhất
+```sql
+SELECT
+  ch.created_at AS care_date,
+  s.full_name AS staff_name,
+  ch.note,
+  ch.status
+FROM customer_care_history ch
+LEFT JOIN staff s ON s.id = ch.staff_id
+WHERE ch.customer_id = :customer_id
+ORDER BY ch.created_at DESC
+LIMIT 10;
+```
+
+### Mapping sang payload insight
+```json
+{
+  "customer": {"id": 920954, "name": "...", "branch": "..."},
+  "metrics": {
+    "invoice_count": 148,
+    "total_spent": 2700000000,
+    "total_debt": 389000000,
+    "total_loan": 125000000,
+    "days_since_last_purchase": 32
+  },
+  "recent_purchases": [...],
+  "recent_care_history": [...]
+}
+```
+
+## 6. Workflow n8n cụ thể từng node
+
+### Option A — On-demand khi mở màn hình khách
+**Flow:** CRM/UI -> endpoint -> n8n -> insight JSON
+
+#### Nodes đề xuất
+1. **Webhook**
+   - nhận `customer_id`
+2. **HTTP Request / DB Query: Get customer profile**
+3. **HTTP Request / DB Query: Get metrics**
+4. **HTTP Request / DB Query: Get recent purchases**
+5. **HTTP Request / DB Query: Get recent care history**
+6. **Function / Code node**
+   - normalize payload
+   - tính rule-based flags cơ bản
+7. **IF node**
+   - nếu đủ dữ liệu và cần AI summary thì đi tiếp
+8. **OpenAI/OpenClaw HTTP node**
+   - tạo summary + next actions
+9. **Function node**
+   - gộp JSON cuối cùng
+10. **Respond to Webhook**
+
+### Option B — Precompute định kỳ bằng cron
+**Flow:** Cron -> quét khách cần cập nhật -> tính insight -> cache
+
+#### Nodes đề xuất
+1. **Cron**
+2. **DB Query / HTTP Request: Get changed customers**
+3. **Split in Batches**
+4. **Get profile**
+5. **Get metrics**
+6. **Get recent purchases**
+7. **Get recent care history**
+8. **Code node: calculate score/tags/alerts**
+9. **OpenClaw/LLM node: summary + next action**
+10. **Store cache (Redis / table / JSON store / file)**
+11. **Next batch**
+
+## 7. Rule engine gợi ý trước khi gọi AI
+
+### Score sơ bộ
+```text
+score = 50
+if total_spent > 1_000_000_000 => +20
+if invoice_count > 50 => +10
+if total_debt > 300_000_000 => -10
+if days_since_last_purchase > 30 => -8
+if days_since_last_purchase <= 7 => +8
+```
+
+### Tags
+```text
+if total_spent > 1_000_000_000 => high_value
+if total_debt > 300_000_000 => debt_watch
+if invoice_count > 30 => repeat_customer
+if days_since_last_purchase > 30 => inactive
+```
+
+### Khi nào mới gọi AI
+- Có ít nhất profile + metrics + vài lịch sử gần nhất
+- Chỉ gọi để tạo:
+  - summary
+  - next_actions
+  - wording tự nhiên
+- Không gọi AI chỉ để tính count/sum/segment đơn giản
+
+## 8. Mức triển khai ít đụng CRM nhất
 - Giữ CRM gần như nguyên.
 - Chỉ thêm 1 box UI gọi API ngoài.
 - API ngoài có thể do CI3 gọi sang n8n hoặc service riêng.
