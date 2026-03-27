@@ -1,0 +1,109 @@
+<style>
+.ai-insight-box{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,.06);font-family:Arial,sans-serif}
+.ai-insight-box__header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.ai-insight-box__header h3{margin:0;font-size:18px}
+.ai-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;background:#fef3c7;color:#92400e}
+.ai-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;font-size:13px;color:#374151}
+.ai-section{margin-bottom:14px}
+.ai-section h4{margin:0 0 8px 0;font-size:14px;color:#111827}
+.ai-section p,.ai-section li{font-size:14px;color:#374151;line-height:1.5}
+.ai-section ul,.ai-section ol{margin:0;padding-left:18px}
+.ai-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ai-actions button{border:1px solid #d1d5db;background:#f9fafb;padding:8px 12px;border-radius:8px;cursor:pointer}
+</style>
+
+<div class="ai-insight-box" id="aiInsightBox">
+  <div class="ai-insight-box__header">
+    <h3>AI Customer Insight</h3>
+    <span class="ai-badge" id="aiInsightSegment">Loading...</span>
+  </div>
+
+  <div class="ai-meta">
+    <div><strong>Score:</strong> <span id="aiInsightScore">-</span></div>
+    <div><strong>Invoice:</strong> <span id="aiInsightInvoiceCount">-</span></div>
+    <div><strong>Nợ:</strong> <span id="aiInsightDebt">-</span></div>
+  </div>
+
+  <div class="ai-section">
+    <h4>Tóm tắt nhanh</h4>
+    <p id="aiInsightSummary">Đang tải dữ liệu...</p>
+  </div>
+
+  <div class="ai-section">
+    <h4>Cảnh báo</h4>
+    <ul id="aiInsightAlerts">
+      <li>Đang tải...</li>
+    </ul>
+  </div>
+
+  <div class="ai-section">
+    <h4>Hành động đề xuất</h4>
+    <ol id="aiInsightActions">
+      <li>Đang tải...</li>
+    </ol>
+  </div>
+
+  <div class="ai-actions">
+    <button type="button">Phân tích sâu</button>
+    <button type="button">Soạn tin nhắn</button>
+    <button type="button">Tóm tắt lịch sử</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  function getCustomerIdFromUrl() {
+    var match = window.location.pathname.match(/\/customers\/history\/(\d+)/);
+    return match ? match[1] : null;
+  }
+
+  function formatMoney(value) {
+    if (value === null || value === undefined) return '-';
+    try { return Number(value).toLocaleString('vi-VN'); } catch (e) { return value; }
+  }
+
+  function renderInsight(data) {
+    document.getElementById('aiInsightSegment').textContent = data.segment || 'Normal';
+    document.getElementById('aiInsightScore').textContent = (data.score || 0) + '/100';
+    document.getElementById('aiInsightInvoiceCount').textContent = data.metrics && data.metrics.invoice_count ? data.metrics.invoice_count : 0;
+    document.getElementById('aiInsightDebt').textContent = data.metrics ? formatMoney(data.metrics.total_debt) : '-';
+    document.getElementById('aiInsightSummary').textContent = data.summary || 'Chưa có dữ liệu phân tích.';
+
+    var alertsEl = document.getElementById('aiInsightAlerts');
+    alertsEl.innerHTML = '';
+    if (data.alerts && data.alerts.length) {
+      data.alerts.forEach(function (item) {
+        var li = document.createElement('li');
+        li.textContent = item.message || item.code || 'Alert';
+        alertsEl.appendChild(li);
+      });
+    } else {
+      alertsEl.innerHTML = '<li>Không có cảnh báo nổi bật.</li>';
+    }
+
+    var actionsEl = document.getElementById('aiInsightActions');
+    actionsEl.innerHTML = '';
+    if (data.next_actions && data.next_actions.length) {
+      data.next_actions.forEach(function (item) {
+        var li = document.createElement('li');
+        li.textContent = item.label || item.type || 'Action';
+        actionsEl.appendChild(li);
+      });
+    } else {
+      actionsEl.innerHTML = '<li>Chưa có hành động đề xuất.</li>';
+    }
+  }
+
+  var customerId = getCustomerIdFromUrl();
+  if (!customerId) return;
+
+  fetch('/api/customer-insight/' + customerId, { credentials: 'same-origin' })
+    .then(function (res) { return res.json(); })
+    .then(renderInsight)
+    .catch(function () {
+      document.getElementById('aiInsightSummary').textContent = 'Không tải được AI insight.';
+      document.getElementById('aiInsightAlerts').innerHTML = '<li>Lỗi tải dữ liệu.</li>';
+      document.getElementById('aiInsightActions').innerHTML = '<li>Vui lòng thử lại sau.</li>';
+    });
+})();
+</script>
