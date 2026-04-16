@@ -19,6 +19,7 @@ Project xây dựng vũ trụ nhân vật thiếu nhi xoay quanh chú mèo cam m
 - `characters.md`: hồ sơ nhân vật
 - `visual-style-guide.md`: quy chuẩn hình ảnh và tính nhất quán
 - `prompt-library.md`: prompt gốc để tạo nhân vật ổn định
+- `character-sheets.md`: character sheet chi tiết cho từng nhân vật
 - `story-framework.md`: khung viết tập truyện/video ngắn
 
 ## Hướng dùng
