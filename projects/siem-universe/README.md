@@ -22,6 +22,7 @@ Project xây dựng vũ trụ nhân vật thiếu nhi xoay quanh chú mèo cam m
 - `character-sheets.md`: character sheet chi tiết cho từng nhân vật
 - `group-scene-prompts.md`: prompt tạo ảnh nhóm và ảnh thương hiệu
 - `episode-ideas-01-10.md`: 10 tập ý tưởng đầu tiên
+- `scripts-episode-01-03.md`: kịch bản chi tiết tập 1 đến 3
 - `story-framework.md`: khung viết tập truyện/video ngắn
 
 ## Hướng dùng
