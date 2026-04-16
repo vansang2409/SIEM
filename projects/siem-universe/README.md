@@ -24,6 +24,7 @@ Project xây dựng vũ trụ nhân vật thiếu nhi xoay quanh chú mèo cam m
 - `episode-ideas-01-10.md`: 10 tập ý tưởng đầu tiên
 - `scripts-episode-01-03.md`: kịch bản chi tiết tập 1 đến 3
 - `video-production-workflow.md`: workflow sản xuất video AI
+- `episode-01-production-pack.md`: prompt scene và voice script cho tập 01
 - `story-framework.md`: khung viết tập truyện/video ngắn
 
 ## Hướng dùng
