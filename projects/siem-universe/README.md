@@ -25,6 +25,10 @@ Project xây dựng vũ trụ nhân vật thiếu nhi xoay quanh chú mèo cam m
 - `scripts-episode-01-03.md`: kịch bản chi tiết tập 1 đến 3
 - `video-production-workflow.md`: workflow sản xuất video AI
 - `episode-01-production-pack.md`: prompt scene và voice script cho tập 01
+- `episode-02-production-pack.md`: prompt scene và voice script cho tập 02
+- `episode-03-production-pack.md`: prompt scene và voice script cho tập 03
+- `production-pack-template.md`: template production pack để nhân bản
+- `caption-and-title-template.md`: template tiêu đề và caption đăng video
 - `story-framework.md`: khung viết tập truyện/video ngắn
 
 ## Hướng dùng
